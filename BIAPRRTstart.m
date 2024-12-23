@@ -50,8 +50,7 @@ for k = 1:numNodes
         tree1.nodes = [tree1.nodes; new_point1];
         tree1.parent = [tree1.parent; nearest_idx1];
         tree1.cost = [tree1.cost; tree1.cost(nearest_idx1) + norm(new_point1 - nearest_node1)];
-        line([nearest_node1(1), new_point1(1)], [nearest_node1(2), new_point1(2)], ...
-            'Color', 'm', 'LineWidth', 1);
+        line([nearest_node1(1), new_point1(1)], [nearest_node1(2), new_point1(2)], 'Color', 'm', 'LineWidth', 2);
         M(counter) = getframe;
         counter = counter + 1;
         [nearest_node2, nearest_idx2] = findNearestNode(tree2.nodes, new_point1);
@@ -68,8 +67,7 @@ for k = 1:numNodes
         tree2.nodes = [tree2.nodes; new_point2];
         tree2.parent = [tree2.parent; nearest_idx2];
         tree2.cost = [tree2.cost; tree2.cost(nearest_idx2) + norm(new_point2 - nearest_node2)];
-        line([nearest_node2(1), new_point2(1)], [nearest_node2(2), new_point2(2)], ...
-            'Color', 'c', 'LineWidth', 1);
+        line([nearest_node2(1), new_point2(1)], [nearest_node2(2), new_point2(2)], 'Color', 'c', 'LineWidth',2);
         M(counter) = getframe;
         counter = counter + 1;
         [nearest_node1, nearest_idx1] = findNearestNode(tree1.nodes, new_point2);
@@ -80,6 +78,11 @@ for k = 1:numNodes
             break;
         end
     end
+end
+
+if ~goal_reached
+    disp('未能找到路径！');
+    return;
 end
 found_connection = false;
 for i = 1:size(tree1.nodes, 1)
@@ -95,6 +98,19 @@ for i = 1:size(tree1.nodes, 1)
         break;
     end
 end
+
+if ~found_connection
+    disp('两棵树无法连接！');
+    return;
+end
+path1 = backtracePath(tree1.nodes, tree1.parent, connect_idx1);
+path2 = backtracePath(tree2.nodes, tree2.parent, connect_idx2); 
+final_path = [tree1.nodes(connect_idx1, :); tree2.nodes(connect_idx2, :)];
+for i = 1:size(final_path, 1)-1
+line([final_path(1, 1), final_path(2, 1)], [final_path(1, 2), final_path(2, 2)], 'Color', 'b', 'LineWidth', 2);
+end
+
+disp('找到路径！');
 function [nearest_node, nearest_idx] = findNearestNode(nodes, point)
     distances = vecnorm(nodes - point, 2, 2);
     [~, nearest_idx] = min(distances);
@@ -159,4 +175,20 @@ function path = backtracePath(nodes, parent, idx)
         path = [path; nodes(idx, :)];
         idx = parent(idx);
     end
+end
+function adjusted_point = applyArtificialPotentialField(rand_point, goal_pose, obstacles, K_att, K_rep, d_0)
+    attractive_force = K_att * (goal_pose - rand_point);
+    repulsive_force = [0, 0];
+    for i = 1:size(obstacles, 1)
+        obs_x = obstacles(i, 1);
+        obs_y = obstacles(i, 2);
+        obs_width = obstacles(i, 3);
+        obs_height = obstacles(i, 4);
+        obs_center = [obs_x + obs_width / 2, obs_y + obs_height / 2];
+        distance = norm(rand_point - obs_center);
+        if distance < d_0
+            repulsive_force = repulsive_force + K_rep * (1 / distance - 1 / d_0) * (1 / distance^2) * (rand_point - obs_center) / distance;
+        end
+    end
+    adjusted_point = rand_point + attractive_force + repulsive_force;
 end
